@@ -17,10 +17,10 @@ class SlitscanApp {
     // Buffer
     let buffers = []
     let currentBuffer = 0;
-    let numBuffers = 10;
+    let numBuffers = 64;
     let bufferContainer = document.querySelector('.buffers-container')
-    let bufferWidth = 50
-    let bufferHeight = 50
+    let bufferWidth = 512
+    let bufferHeight = 512
 
     const getTexture = (canvas) => {
       let image = new Image();
@@ -45,7 +45,7 @@ class SlitscanApp {
       canvas.height = bufferHeight
       let ctx = canvas.getContext('2d')
 
-      let grad= ctx.createLinearGradient(0, 0, bufferWidth, 0);
+      let grad= ctx.createLinearGradient(0, 0, bufferWidth, bufferHeight);
       grad.addColorStop(start, "#000");
       grad.addColorStop(stop, "#FFF");
 
@@ -62,15 +62,32 @@ class SlitscanApp {
      * Create Buffers
      */
 
+    let bufferCanvas = document.createElement('canvas')
+    bufferCanvas.width = bufferWidth
+    bufferCanvas.height = bufferHeight
+    let bufferCtx = bufferCanvas.getContext('2d')
+    let buffersPerRow = 8; //Math.ceil(bufferWidth/numBuffers);
+    let numRow = 0;
+    let numCol = 0;
+
     for (var i = 0; i < numBuffers; i++) {
-      let canvas = document.createElement('canvas')
-      canvas.width = bufferWidth
-      canvas.height = bufferHeight
-      let ctx = canvas.getContext('2d')
-      ctx.fillStyle = `rgb(${Math.floor(255-25.5*i)}, ${Math.floor(255-25.5*i)}, 255)`;
-      ctx.fillRect(0, 0, bufferWidth, bufferHeight)
-      buffers[i] = canvas;
-      bufferContainer.appendChild(canvas)
+      //bufferCtx.fillStyle = `rgb(${Math.floor(255-(255/numBuffers)*i)}, ${Math.floor(255-(255/numBuffers)*i)}, 255)`;
+      let grad= bufferCtx.createLinearGradient(0, 0, bufferWidth, 0);
+      grad.addColorStop(0, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
+      grad.addColorStop(1, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
+      bufferCtx.fillStyle = grad;
+
+      let x = Math.floor((bufferWidth/buffersPerRow)*numCol);
+      let y = Math.floor((bufferHeight/buffersPerRow)*numRow);
+
+      if(numCol == buffersPerRow-1){
+        numRow++;
+        numCol = 0;
+      }else {
+        numCol++;
+      }
+      bufferCtx.fillRect(x, y, bufferWidth/buffersPerRow, bufferHeight/buffersPerRow)
+      bufferContainer.appendChild(bufferCanvas)
     }
 
     /**
@@ -84,9 +101,6 @@ class SlitscanApp {
 
     this.renderer.setPixelRatio(window.devicePixelRatio)
     this.renderer.setSize( 800, 600 );
-
-    this.renderer.domElement.setAttribute('id', 'binorycanvas')
-    this.renderer.domElement.setAttribute('binory-canvas', '')
     this.el.appendChild(this.renderer.domElement)
 
     let bufferArray = []
@@ -100,7 +114,8 @@ class SlitscanApp {
       resolution:       { type: "v2", value: new THREE.Vector2(800, 600) },
       mask:             { type: "t", value: getTexture(maskCanvas)},
       numBuffers:       { type: "f", value: numBuffers},
-      bufferArray:      { type: "tv", value: bufferArray}
+      buffer:           { type: "t", value: getTexture(bufferCanvas)},
+      buffersPerRow:    { type: "f", value: buffersPerRow}
     }
 
     let vertexShader = `
@@ -108,34 +123,23 @@ class SlitscanApp {
         gl_Position = vec4( position, 1.0 );
       }`;
 
-    let fragmentShaderIfstatement = '';
-    for (var i = 0; i < numBuffers; i++) {
-      if(i == 0){
-          fragmentShaderIfstatement += `if(arrayIndex == ${i}.){
-            bufferPixel = texture2D(bufferArray[${i}], p);
-          }`
-      } else {
-        fragmentShaderIfstatement += `else if(arrayIndex == ${i}.){
-          bufferPixel = texture2D(bufferArray[${i}], p);
-        }`
-      }
-    }
-
     let fragmentShader = `
       uniform float time;
       uniform float numBuffers;
       uniform vec2 resolution;
+      uniform float buffersPerRow;
 
       uniform sampler2D mask;
-      uniform sampler2D bufferArray[${numBuffers}];
+      uniform sampler2D buffer;
 
       vec4 drawPixel (vec2 p) {
         vec4 maskPixel = texture2D(mask, p);
         float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));
         float arrayIndex = floor((brightness/2.)*numBuffers);
-        vec4 bufferPixel;
 
-        ${fragmentShaderIfstatement}
+        vec2 spritePos = p;
+        vec4 bufferPixel = texture2D(buffer,  spritePos);
+
 
         return bufferPixel;
       }

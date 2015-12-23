@@ -41,10 +41,10 @@ var SlitscanApp = (function () {
       // Buffer
       var buffers = [];
       var currentBuffer = 0;
-      var numBuffers = 10;
+      var numBuffers = 64;
       var bufferContainer = document.querySelector('.buffers-container');
-      var bufferWidth = 50;
-      var bufferHeight = 50;
+      var bufferWidth = 512;
+      var bufferHeight = 512;
 
       var getTexture = function getTexture(canvas) {
         var image = new Image();
@@ -69,7 +69,7 @@ var SlitscanApp = (function () {
         canvas.height = bufferHeight;
         var ctx = canvas.getContext('2d');
 
-        var grad = ctx.createLinearGradient(0, 0, bufferWidth, 0);
+        var grad = ctx.createLinearGradient(0, 0, bufferWidth, bufferHeight);
         grad.addColorStop(start, "#000");
         grad.addColorStop(stop, "#FFF");
 
@@ -86,15 +86,32 @@ var SlitscanApp = (function () {
        * Create Buffers
        */
 
+      var bufferCanvas = document.createElement('canvas');
+      bufferCanvas.width = bufferWidth;
+      bufferCanvas.height = bufferHeight;
+      var bufferCtx = bufferCanvas.getContext('2d');
+      var buffersPerRow = 8; //Math.ceil(bufferWidth/numBuffers);
+      var numRow = 0;
+      var numCol = 0;
+
       for (var i = 0; i < numBuffers; i++) {
-        var canvas = document.createElement('canvas');
-        canvas.width = bufferWidth;
-        canvas.height = bufferHeight;
-        var ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgb(' + Math.floor(255 - 25.5 * i) + ', ' + Math.floor(255 - 25.5 * i) + ', 255)';
-        ctx.fillRect(0, 0, bufferWidth, bufferHeight);
-        buffers[i] = canvas;
-        bufferContainer.appendChild(canvas);
+        //bufferCtx.fillStyle = `rgb(${Math.floor(255-(255/numBuffers)*i)}, ${Math.floor(255-(255/numBuffers)*i)}, 255)`;
+        var grad = bufferCtx.createLinearGradient(0, 0, bufferWidth, 0);
+        grad.addColorStop(0, 'rgb(' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ')');
+        grad.addColorStop(1, 'rgb(' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ')');
+        bufferCtx.fillStyle = grad;
+
+        var x = Math.floor(bufferWidth / buffersPerRow * numCol);
+        var y = Math.floor(bufferHeight / buffersPerRow * numRow);
+
+        if (numCol == buffersPerRow - 1) {
+          numRow++;
+          numCol = 0;
+        } else {
+          numCol++;
+        }
+        bufferCtx.fillRect(x, y, bufferWidth / buffersPerRow, bufferHeight / buffersPerRow);
+        bufferContainer.appendChild(bufferCanvas);
       }
 
       /**
@@ -108,9 +125,6 @@ var SlitscanApp = (function () {
 
       this.renderer.setPixelRatio(window.devicePixelRatio);
       this.renderer.setSize(800, 600);
-
-      this.renderer.domElement.setAttribute('id', 'binorycanvas');
-      this.renderer.domElement.setAttribute('binory-canvas', '');
       this.el.appendChild(this.renderer.domElement);
 
       var bufferArray = [];
@@ -124,21 +138,13 @@ var SlitscanApp = (function () {
         resolution: { type: "v2", value: new THREE.Vector2(800, 600) },
         mask: { type: "t", value: getTexture(maskCanvas) },
         numBuffers: { type: "f", value: numBuffers },
-        bufferArray: { type: "tv", value: bufferArray }
+        buffer: { type: "t", value: getTexture(bufferCanvas) },
+        buffersPerRow: { type: "f", value: buffersPerRow }
       };
 
       var vertexShader = '\n      void main()\t{\n        gl_Position = vec4( position, 1.0 );\n      }';
 
-      var fragmentShaderIfstatement = '';
-      for (var i = 0; i < numBuffers; i++) {
-        if (i == 0) {
-          fragmentShaderIfstatement += 'if(arrayIndex == ' + i + '.){\n            bufferPixel = texture2D(bufferArray[' + i + '], p);\n          }';
-        } else {
-          fragmentShaderIfstatement += 'else if(arrayIndex == ' + i + '.){\n          bufferPixel = texture2D(bufferArray[' + i + '], p);\n        }';
-        }
-      }
-
-      var fragmentShader = '\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n\n      uniform sampler2D mask;\n      uniform sampler2D bufferArray[' + numBuffers + '];\n\n      vec4 drawPixel (vec2 p) {\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n        vec4 bufferPixel;\n\n        ' + fragmentShaderIfstatement + '\n\n        return bufferPixel;\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawPixel(p);\n      }';
+      var fragmentShader = '\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n      uniform float buffersPerRow;\n\n      uniform sampler2D mask;\n      uniform sampler2D buffer;\n\n      vec4 drawPixel (vec2 p) {\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n\n        vec2 spritePos = p;\n        vec4 bufferPixel = texture2D(buffer,  spritePos);\n\n\n        return bufferPixel;\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawPixel(p);\n      }';
 
       var material = new THREE.ShaderMaterial({
         uniforms: uniforms,

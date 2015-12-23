@@ -27,15 +27,20 @@ var MaskCanvas = (function () {
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     this.ctx = this.canvas.getContext('2d');
-    this.ctx.fillStyle = "rgba(255, 255, 255, 1)";
-    this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    //this.ctx.fillStyle = "rgba(255, 255, 255, 1)";
+    /*let gradient = this.ctx.createLinearGradient(0, 0, window.innerWidth, 0);
+    gradient.addColorStop(0, `rgba(255,255,255,1)`);
+    gradient.addColorStop(0.7, `rgba(0,0,0,1)`);
+    this.ctx.fillStyle = gradient
+     this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)*/
 
     for (var i = 0; i < 60; i++) {
       var size = 200;
       var pos = { x: Math.random() * (window.innerWidth - size), y: Math.random() * (window.innerHeight - size) };
       var gradient = this.ctx.createRadialGradient(pos.x + size / 2, pos.y + size / 2, size / 2, pos.x + size / 2, pos.y + size / 2, 0);
-      gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(1, 'rgba(255,255,255,1)');
+      gradient.addColorStop(0, 'rgba(255,255,255,0)');
+      gradient.addColorStop(0.7, 'rgba(0,0,0,1)');
       this.ctx.fillStyle = gradient;
       this.ctx.fillRect(pos.x, pos.y, size, size);
     }
@@ -55,11 +60,11 @@ var MaskCanvas = (function () {
 module.exports = MaskCanvas;
 
 },{}],3:[function(require,module,exports){
-'use strict';
+"use strict";
 
 var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var _MaskCanvas = require('./MaskCanvas');
+var _MaskCanvas = require("./MaskCanvas");
 
 var _MaskCanvas2 = _interopRequireDefault(_MaskCanvas);
 
@@ -79,9 +84,24 @@ var SlitscanApp = (function () {
   }
 
   _createClass(SlitscanApp, [{
-    key: 'initScene',
+    key: "initScene",
     value: function initScene() {
       var _this = this;
+
+      var video = document.createElement("video");
+      var videoCanvas = document.createElement("canvas");
+      var videoCtx = videoCanvas.getContext("2d");
+
+      navigator.getUserMedia = navigator.mozGetUserMedia || navigator.getUserMedia || navigator.webkitGetUserMedia;
+
+      navigator.getUserMedia({ video: true }, function (stream) {
+        var url = URL.createObjectURL(stream);
+        video.src = url;
+        video.play();
+        //document.body.appendChild(video)
+      }, function () {
+        alert("NAH");
+      });
 
       this.camera = new THREE.Camera();
       this.camera.position.z = 1;
@@ -92,10 +112,10 @@ var SlitscanApp = (function () {
       // Buffer
       var buffers = [];
       var currentBuffer = 0;
-      var numBuffers = 8;
+      var numBuffers = 48;
       var bufferContainer = document.querySelector('.buffers-container');
-      var bufferWidth = 512;
-      var bufferHeight = 512;
+      var bufferWidth = 12;
+      var bufferHeight = 12;
 
       var getTexture = function getTexture(canvas) {
         var image = new Image();
@@ -122,15 +142,16 @@ var SlitscanApp = (function () {
       var bufferCtx = bufferCanvas.getContext('2d');
       var numCol = 0;
 
-      for (var i = 0; i < numBuffers; i++) {
+      for (var _i = 0; _i < numBuffers; _i++) {
         var grad = bufferCtx.createLinearGradient(0, 0, bufferWidth, 0);
-        grad.addColorStop(0, 'rgb(' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ')');
-        grad.addColorStop(1, 'rgb(' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ', ' + Math.round(Math.random() * 255) + ')');
+        grad.addColorStop(0, "rgb(140, 20, " + Math.round(_i * (255 / numBuffers)));
+        grad.addColorStop(1, "rgb(140, 20, " + Math.round(_i * (255 / numBuffers)));
+        //grad.addColorStop(1, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
         bufferCtx.fillStyle = grad;
 
         numCol++;
-        bufferCtx.fillRect(bufferWidth * i, 0, bufferWidth, bufferHeight);
-        bufferContainer.appendChild(bufferCanvas);
+        bufferCtx.fillRect(bufferWidth * _i, 0, bufferWidth, bufferHeight);
+        //bufferContainer.appendChild(bufferCanvas)
       }
 
       /**
@@ -160,9 +181,9 @@ var SlitscanApp = (function () {
         tileSize: { type: "v2", value: new THREE.Vector2(bufferWidth, bufferHeight) }
       };
 
-      var vertexShader = '\n      void main()\t{\n        gl_Position = vec4( position, 1.0 );\n      }';
+      var vertexShader = "\n      void main()\t{\n        gl_Position = vec4( position, 1.0 );\n      }";
 
-      var fragmentShader = '\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n      uniform float buffersPerRow;\n\n      uniform sampler2D mask;\n      uniform sampler2D buffer;\n\n      uniform vec2 spriteSize;\n      uniform vec2 tileSize;\n\n      // Spritesheets\n      vec4 drawSprite (vec2 p) {\n\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n        ivec2 tile = ivec2(arrayIndex, 0);\n\n        vec2 absP = p*resolution.xy;\n        vec2 tileRatio = tileSize/spriteSize;\n        vec2 tilePosition = vec2(tile)*tileRatio;\n        return texture2D(buffer, p*tileRatio+tilePosition);\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawSprite(p);\n      }';
+      var fragmentShader = "\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n      uniform float buffersPerRow;\n\n      uniform sampler2D mask;\n      uniform sampler2D buffer;\n\n      uniform vec2 spriteSize;\n      uniform vec2 tileSize;\n\n      // Spritesheets\n      vec4 drawSprite (vec2 p) {\n\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n        ivec2 tile = ivec2(arrayIndex, 0);\n\n        vec2 absP = p*resolution.xy;\n        vec2 tileRatio = tileSize/spriteSize;\n        vec2 tilePosition = vec2(tile)*tileRatio;\n        return texture2D(buffer, p*tileRatio+tilePosition);\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawSprite(p);\n      }";
 
       var material = new THREE.ShaderMaterial({
         uniforms: uniforms,
@@ -173,18 +194,23 @@ var SlitscanApp = (function () {
       var mesh = new THREE.Mesh(geometry, material);
       this.scene.add(mesh);
 
+      var index = 0;
       var render = function render() {
+        videoCanvas.width = video.videoWidth;
+        videoCanvas.height = video.videoHeight;
 
-        /*maskIndex++;
-        if(maskIndex > 100){
-          maskIndex = 0;
+        if (videoCanvas.width > 0) {
+          bufferCtx.drawImage(video, bufferWidth * index, 0, bufferWidth, bufferHeight);
+          index++;
+          if (index > numBuffers) {
+            index = 0;
+          }
         }
-        maskCanvas = getMask(maskIndex/100,1)
-        let maskTexture = getTexture(maskCanvas);
-        maskTexture.needsUpdate = true*/
 
         uniforms.time.value += 0.005;
-        //uniforms.mask.value = maskTexture
+        var bufferTexture = getTexture(bufferCanvas);
+        uniforms.buffer.value = bufferTexture;
+        bufferTexture.needsUpdate = true;
 
         _this.renderer.render(_this.scene, _this.camera);
         requestAnimationFrame(render.bind(_this));
@@ -193,7 +219,7 @@ var SlitscanApp = (function () {
       render();
     }
   }, {
-    key: 'resize',
+    key: "resize",
     value: function resize() {
       //this.el.width = window.innerWidth;
       //this.el.height = window.innerHeight;

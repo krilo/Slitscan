@@ -12,6 +12,22 @@ class SlitscanApp {
 
   initScene(){
 
+    let video = document.createElement("video");
+    let videoCanvas = document.createElement("canvas");
+    let videoCtx = videoCanvas.getContext("2d");
+
+    navigator.getUserMedia = navigator.mozGetUserMedia || navigator.getUserMedia || navigator.webkitGetUserMedia;
+
+    navigator.getUserMedia({video: true}, function(stream) {
+      let url = URL.createObjectURL(stream);
+      video.src = url;
+      video.play();
+      //document.body.appendChild(video)
+    }, function() {
+      alert("NAH");
+    });
+
+
     this.camera = new THREE.Camera( )
     this.camera.position.z = 1
     this.scene = new THREE.Scene();
@@ -21,10 +37,10 @@ class SlitscanApp {
     // Buffer
     let buffers = []
     let currentBuffer = 0;
-    let numBuffers = 8;
+    let numBuffers = 48;
     let bufferContainer = document.querySelector('.buffers-container')
-    let bufferWidth = 512
-    let bufferHeight = 512
+    let bufferWidth = 12
+    let bufferHeight = 12
 
     const getTexture = (canvas) => {
       let image = new Image();
@@ -51,15 +67,16 @@ class SlitscanApp {
     let bufferCtx = bufferCanvas.getContext('2d')
     let numCol = 0;
 
-    for (var i = 0; i < numBuffers; i++) {
+    for (let i = 0; i < numBuffers; i++) {
       let grad= bufferCtx.createLinearGradient(0, 0, bufferWidth, 0);
-      grad.addColorStop(0, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
-      grad.addColorStop(1, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
+      grad.addColorStop(0, `rgb(140, 20, ${Math.round(i*(255/numBuffers))}`);
+      grad.addColorStop(1, `rgb(140, 20, ${Math.round(i*(255/numBuffers))}`);
+      //grad.addColorStop(1, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
       bufferCtx.fillStyle = grad;
 
       numCol++;
       bufferCtx.fillRect(bufferWidth*i, 0, bufferWidth, bufferHeight)
-      bufferContainer.appendChild(bufferCanvas)
+      //bufferContainer.appendChild(bufferCanvas)
     }
 
     /**
@@ -134,18 +151,24 @@ class SlitscanApp {
     let mesh = new THREE.Mesh(geometry, material)
     this.scene.add(mesh)
 
+    let index = 0;
     const render = () => {
+      videoCanvas.width = video.videoWidth;
+      videoCanvas.height = video.videoHeight;
 
-      /*maskIndex++;
-      if(maskIndex > 100){
-        maskIndex = 0;
+
+      if (videoCanvas.width > 0) {
+        bufferCtx.drawImage(video,bufferWidth*index, 0, bufferWidth, bufferHeight)
+        index++;
+        if(index > numBuffers){
+          index = 0;
+        }
       }
-      maskCanvas = getMask(maskIndex/100,1)
-      let maskTexture = getTexture(maskCanvas);
-      maskTexture.needsUpdate = true*/
 
       uniforms.time.value += 0.005;
-      //uniforms.mask.value = maskTexture
+      let bufferTexture = getTexture(bufferCanvas);
+      uniforms.buffer.value = bufferTexture;
+      bufferTexture.needsUpdate = true;
 
       this.renderer.render( this.scene, this.camera );
       requestAnimationFrame( render.bind(this) );

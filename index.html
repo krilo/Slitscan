@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Slitscan</title>
+    <style media="screen">
+      html, body {
+        margin: 0px;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+        background: #010101;
+      }
+      #app {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        width: 100%;
+        height: 100%;
+      }
+      video {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+      }
+      .buffers-container {
+        position: absolute;
+        bottom: 0px;
+        left: 0px;
+      }
+    </style>
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+      void main()	{
+        gl_Position = vec4( position, 1.0 );
+      }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+
+      uniform float time;
+      uniform float numBuffers;
+      uniform vec2 resolution;
+
+      uniform sampler2D mask;
+      uniform sampler2D bufferArray[10];
+
+      vec4 drawPixel (vec2 p) {
+        vec4 maskPixel = texture2D(mask, p);
+        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));
+        float arrayIndex = floor((brightness/2.)*numBuffers);
+        vec4 bufferPixel;
+
+        if(arrayIndex == 0.){
+          bufferPixel = texture2D(bufferArray[0], p);
+        } else if (arrayIndex == 1.) {
+          bufferPixel = texture2D(bufferArray[1], p);
+        } else if (arrayIndex == 2.) {
+          bufferPixel = texture2D(bufferArray[2], p);
+        } else if (arrayIndex == 3.) {
+          bufferPixel = texture2D(bufferArray[3], p);
+        } else if (arrayIndex == 4.) {
+          bufferPixel = texture2D(bufferArray[4], p);
+        } else if (arrayIndex == 5.) {
+          bufferPixel = texture2D(bufferArray[5], p);
+        } else if (arrayIndex == 6.) {
+          bufferPixel = texture2D(bufferArray[6], p);
+        } else if (arrayIndex == 7.) {
+          bufferPixel = texture2D(bufferArray[7], p);
+        } else if (arrayIndex == 8.) {
+          bufferPixel = texture2D(bufferArray[8], p);
+        } else {
+          bufferPixel = texture2D(bufferArray[9], p);
+        };
+
+        return bufferPixel;
+      }
+
+      void main() {
+        vec2 p = ( gl_FragCoord.xy / resolution.xy );
+        gl_FragColor = drawPixel(p);
+      }
+
+    </script>
+
+  </head>
+  <body>
+    <div id="app"></div>
+    <div class="buffers-container"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js" charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r73/three.min.js" charset="utf-8"></script>
+    <script src="./dist/index.js" charset="utf-8"></script>
+  </body>
+</html>

@@ -17,7 +17,7 @@ class SlitscanApp {
     // Buffer
     let buffers = []
     let currentBuffer = 0;
-    let numBuffers = 4;
+    let numBuffers = 32;
     let bufferContainer = document.querySelector('.buffers-container')
     let bufferWidth = 512
     let bufferHeight = 512
@@ -63,30 +63,19 @@ class SlitscanApp {
      */
 
     let bufferCanvas = document.createElement('canvas')
-    bufferCanvas.width = bufferWidth
-    bufferCanvas.height = bufferHeight
+    bufferCanvas.width = bufferWidth*numBuffers
+    bufferCanvas.height = bufferHeight;
     let bufferCtx = bufferCanvas.getContext('2d')
-    let buffersPerRow = 2; //Math.ceil(bufferWidth/numBuffers);
-    let numRow = 0;
     let numCol = 0;
 
     for (var i = 0; i < numBuffers; i++) {
-      //bufferCtx.fillStyle = `rgb(${Math.floor(255-(255/numBuffers)*i)}, ${Math.floor(255-(255/numBuffers)*i)}, 255)`;
       let grad= bufferCtx.createLinearGradient(0, 0, bufferWidth, 0);
       grad.addColorStop(0, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
       grad.addColorStop(1, `rgb(${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)}, ${Math.round(Math.random()*255)})`);
       bufferCtx.fillStyle = grad;
 
-      let x = Math.floor((bufferWidth/buffersPerRow)*numCol);
-      let y = Math.floor((bufferHeight/buffersPerRow)*numRow);
-
-      if(numCol == buffersPerRow-1){
-        numRow++;
-        numCol = 0;
-      }else {
-        numCol++;
-      }
-      bufferCtx.fillRect(x, y, bufferWidth/buffersPerRow, bufferHeight/buffersPerRow)
+      numCol++;
+      bufferCtx.fillRect(bufferWidth*i, 0, bufferWidth, bufferHeight)
       bufferContainer.appendChild(bufferCanvas)
     }
 
@@ -100,7 +89,7 @@ class SlitscanApp {
     this.renderer.sortObjects = false;
 
     this.renderer.setPixelRatio(window.devicePixelRatio)
-    this.renderer.setSize( 800, 600 );
+    this.renderer.setSize( window.innerWidth, window.innerHeight );
     this.el.appendChild(this.renderer.domElement)
 
     let bufferArray = []
@@ -108,20 +97,15 @@ class SlitscanApp {
       bufferArray[i] = getTexture(buffers[i])
     }
 
-    /*marioSpriteInfos: {
-        size: new Vec2(256,192),
-        tileSize: new Vec2(32,64)
-      },*/
     let geometry = new THREE.PlaneBufferGeometry(2, 2)
     let uniforms = {
       time:             { type: "f", value: 1.0 },
-      resolution:       { type: "v2", value: new THREE.Vector2(800, 600) },
+      resolution:       { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
       mask:             { type: "t", value: getTexture(maskCanvas)},
       numBuffers:       { type: "f", value: numBuffers},
       buffer:           { type: "t", value: getTexture(bufferCanvas)},
-      buffersPerRow:    { type: "f", value: buffersPerRow},
-      spriteSize:       { type: "v2", value: new THREE.Vector2(bufferWidth, bufferWidth) },
-      tileSize:         { type: "v2", value: new THREE.Vector2(bufferWidth/buffersPerRow, bufferHeight/buffersPerRow) }
+      spriteSize:       { type: "v2", value: new THREE.Vector2(bufferWidth*numBuffers, bufferWidth) },
+      tileSize:         { type: "v2", value: new THREE.Vector2(bufferWidth, bufferHeight) }
     }
 
     let vertexShader = `
@@ -143,24 +127,16 @@ class SlitscanApp {
 
       // Spritesheets
       vec4 drawSprite (vec2 p) {
-        ivec2 tile = ivec2(1, 1);
-        
+
+        vec4 maskPixel = texture2D(mask, p);
+        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));
+        float arrayIndex = floor((brightness/2.)*numBuffers);
+        ivec2 tile = ivec2(arrayIndex, 0);
+
         vec2 absP = p*resolution.xy;
         vec2 tileRatio = tileSize/spriteSize;
         vec2 tilePosition = vec2(tile)*tileRatio;
         return texture2D(buffer, p*tileRatio+tilePosition);
-      }
-
-      vec4 drawPixel (vec2 p) {
-        vec4 maskPixel = texture2D(mask, p);
-        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));
-        float arrayIndex = floor((brightness/2.)*numBuffers);
-
-        vec2 spritePos = p;
-        vec4 bufferPixel = texture2D(buffer,  spritePos);
-
-
-        return bufferPixel;
       }
 
       void main() {

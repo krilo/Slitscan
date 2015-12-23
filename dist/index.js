@@ -41,7 +41,7 @@ var SlitscanApp = (function () {
       // Buffer
       var buffers = [];
       var currentBuffer = 0;
-      var numBuffers = 64;
+      var numBuffers = 4;
       var bufferContainer = document.querySelector('.buffers-container');
       var bufferWidth = 512;
       var bufferHeight = 512;
@@ -90,7 +90,7 @@ var SlitscanApp = (function () {
       bufferCanvas.width = bufferWidth;
       bufferCanvas.height = bufferHeight;
       var bufferCtx = bufferCanvas.getContext('2d');
-      var buffersPerRow = 8; //Math.ceil(bufferWidth/numBuffers);
+      var buffersPerRow = 2; //Math.ceil(bufferWidth/numBuffers);
       var numRow = 0;
       var numCol = 0;
 
@@ -132,6 +132,10 @@ var SlitscanApp = (function () {
         bufferArray[i] = getTexture(buffers[i]);
       }
 
+      /*marioSpriteInfos: {
+          size: new Vec2(256,192),
+          tileSize: new Vec2(32,64)
+        },*/
       var geometry = new THREE.PlaneBufferGeometry(2, 2);
       var uniforms = {
         time: { type: "f", value: 1.0 },
@@ -139,12 +143,14 @@ var SlitscanApp = (function () {
         mask: { type: "t", value: getTexture(maskCanvas) },
         numBuffers: { type: "f", value: numBuffers },
         buffer: { type: "t", value: getTexture(bufferCanvas) },
-        buffersPerRow: { type: "f", value: buffersPerRow }
+        buffersPerRow: { type: "f", value: buffersPerRow },
+        spriteSize: { type: "v2", value: new THREE.Vector2(bufferWidth, bufferWidth) },
+        tileSize: { type: "v2", value: new THREE.Vector2(bufferWidth / buffersPerRow, bufferHeight / buffersPerRow) }
       };
 
       var vertexShader = '\n      void main()\t{\n        gl_Position = vec4( position, 1.0 );\n      }';
 
-      var fragmentShader = '\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n      uniform float buffersPerRow;\n\n      uniform sampler2D mask;\n      uniform sampler2D buffer;\n\n      vec4 drawPixel (vec2 p) {\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n\n        vec2 spritePos = p;\n        vec4 bufferPixel = texture2D(buffer,  spritePos);\n\n\n        return bufferPixel;\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawPixel(p);\n      }';
+      var fragmentShader = '\n      uniform float time;\n      uniform float numBuffers;\n      uniform vec2 resolution;\n      uniform float buffersPerRow;\n\n      uniform sampler2D mask;\n      uniform sampler2D buffer;\n\n      uniform vec2 spriteSize;\n      uniform vec2 tileSize;\n\n      // Spritesheets\n      vec4 drawSprite (vec2 p) {\n        ivec2 tile = ivec2(1, 1);\n        \n        vec2 absP = p*resolution.xy;\n        vec2 tileRatio = tileSize/spriteSize;\n        vec2 tilePosition = vec2(tile)*tileRatio;\n        return texture2D(buffer, p*tileRatio+tilePosition);\n      }\n\n      vec4 drawPixel (vec2 p) {\n        vec4 maskPixel = texture2D(mask, p);\n        float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));\n        float arrayIndex = floor((brightness/2.)*numBuffers);\n\n        vec2 spritePos = p;\n        vec4 bufferPixel = texture2D(buffer,  spritePos);\n\n\n        return bufferPixel;\n      }\n\n      void main() {\n        vec2 p = ( gl_FragCoord.xy / resolution.xy );\n        gl_FragColor = drawSprite(p);\n      }';
 
       var material = new THREE.ShaderMaterial({
         uniforms: uniforms,

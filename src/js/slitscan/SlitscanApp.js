@@ -17,7 +17,7 @@ class SlitscanApp {
     // Buffer
     let buffers = []
     let currentBuffer = 0;
-    let numBuffers = 64;
+    let numBuffers = 4;
     let bufferContainer = document.querySelector('.buffers-container')
     let bufferWidth = 512
     let bufferHeight = 512
@@ -66,7 +66,7 @@ class SlitscanApp {
     bufferCanvas.width = bufferWidth
     bufferCanvas.height = bufferHeight
     let bufferCtx = bufferCanvas.getContext('2d')
-    let buffersPerRow = 8; //Math.ceil(bufferWidth/numBuffers);
+    let buffersPerRow = 2; //Math.ceil(bufferWidth/numBuffers);
     let numRow = 0;
     let numCol = 0;
 
@@ -108,6 +108,10 @@ class SlitscanApp {
       bufferArray[i] = getTexture(buffers[i])
     }
 
+    /*marioSpriteInfos: {
+        size: new Vec2(256,192),
+        tileSize: new Vec2(32,64)
+      },*/
     let geometry = new THREE.PlaneBufferGeometry(2, 2)
     let uniforms = {
       time:             { type: "f", value: 1.0 },
@@ -115,7 +119,9 @@ class SlitscanApp {
       mask:             { type: "t", value: getTexture(maskCanvas)},
       numBuffers:       { type: "f", value: numBuffers},
       buffer:           { type: "t", value: getTexture(bufferCanvas)},
-      buffersPerRow:    { type: "f", value: buffersPerRow}
+      buffersPerRow:    { type: "f", value: buffersPerRow},
+      spriteSize:       { type: "v2", value: new THREE.Vector2(bufferWidth, bufferWidth) },
+      tileSize:         { type: "v2", value: new THREE.Vector2(bufferWidth/buffersPerRow, bufferHeight/buffersPerRow) }
     }
 
     let vertexShader = `
@@ -132,6 +138,19 @@ class SlitscanApp {
       uniform sampler2D mask;
       uniform sampler2D buffer;
 
+      uniform vec2 spriteSize;
+      uniform vec2 tileSize;
+
+      // Spritesheets
+      vec4 drawSprite (vec2 p) {
+        ivec2 tile = ivec2(1, 1);
+        
+        vec2 absP = p*resolution.xy;
+        vec2 tileRatio = tileSize/spriteSize;
+        vec2 tilePosition = vec2(tile)*tileRatio;
+        return texture2D(buffer, p*tileRatio+tilePosition);
+      }
+
       vec4 drawPixel (vec2 p) {
         vec4 maskPixel = texture2D(mask, p);
         float brightness = distance(maskPixel, vec4(0.0, 0.0, 0.0, 1.0));
@@ -146,7 +165,7 @@ class SlitscanApp {
 
       void main() {
         vec2 p = ( gl_FragCoord.xy / resolution.xy );
-        gl_FragColor = drawPixel(p);
+        gl_FragColor = drawSprite(p);
       }`;
 
     let material = new THREE.ShaderMaterial( {

@@ -1,3 +1,5 @@
+import MaskCanvas from './MaskCanvas';
+
 class SlitscanApp {
   constructor(options){
     this.el = options.el;
@@ -14,10 +16,12 @@ class SlitscanApp {
     this.camera.position.z = 1
     this.scene = new THREE.Scene();
 
+    this.maskCanvas = new MaskCanvas();
+
     // Buffer
     let buffers = []
     let currentBuffer = 0;
-    let numBuffers = 32;
+    let numBuffers = 8;
     let bufferContainer = document.querySelector('.buffers-container')
     let bufferWidth = 512
     let bufferHeight = 512
@@ -35,27 +39,6 @@ class SlitscanApp {
       };
 
       return texture
-    }
-
-    let addedGradient = false
-    const getMask = (start, stop) => {
-      let canvas = document.querySelector('#mask') || document.createElement('canvas')
-      canvas.setAttribute('id', 'mask')
-      canvas.width = bufferWidth
-      canvas.height = bufferHeight
-      let ctx = canvas.getContext('2d')
-
-      let grad= ctx.createLinearGradient(0, 0, bufferWidth, bufferHeight);
-      grad.addColorStop(start, "#000");
-      grad.addColorStop(stop, "#FFF");
-
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, bufferWidth, bufferHeight)
-      if(!addedGradient){
-        addedGradient = true;
-        bufferContainer.appendChild(canvas)
-      }
-      return canvas;
     }
 
     /**
@@ -82,8 +65,6 @@ class SlitscanApp {
     /**
      * Create Mask
      */
-    let maskIndex = 0;
-    let maskCanvas = getMask(0,1)
 
     this.renderer = new THREE.WebGLRenderer( { alpha: true, antialias: true })
     this.renderer.sortObjects = false;
@@ -101,7 +82,7 @@ class SlitscanApp {
     let uniforms = {
       time:             { type: "f", value: 1.0 },
       resolution:       { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-      mask:             { type: "t", value: getTexture(maskCanvas)},
+      mask:             { type: "t", value: getTexture(this.maskCanvas.canvas)},
       numBuffers:       { type: "f", value: numBuffers},
       buffer:           { type: "t", value: getTexture(bufferCanvas)},
       spriteSize:       { type: "v2", value: new THREE.Vector2(bufferWidth*numBuffers, bufferWidth) },
@@ -155,16 +136,16 @@ class SlitscanApp {
 
     const render = () => {
 
-      maskIndex++;
+      /*maskIndex++;
       if(maskIndex > 100){
         maskIndex = 0;
       }
       maskCanvas = getMask(maskIndex/100,1)
       let maskTexture = getTexture(maskCanvas);
-      maskTexture.needsUpdate = true
+      maskTexture.needsUpdate = true*/
 
       uniforms.time.value += 0.005;
-      uniforms.mask.value = maskTexture
+      //uniforms.mask.value = maskTexture
 
       this.renderer.render( this.scene, this.camera );
       requestAnimationFrame( render.bind(this) );

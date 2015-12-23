@@ -11,10 +11,59 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
   var App = new _SlitscanApp2.default({ el: document.querySelector('#app') });
 })();
 
-},{"./slitscan/SlitscanApp":2}],2:[function(require,module,exports){
+},{"./slitscan/SlitscanApp":3}],2:[function(require,module,exports){
 'use strict';
 
 var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var MaskCanvas = (function () {
+  function MaskCanvas() {
+    _classCallCheck(this, MaskCanvas);
+
+    this.canvas = document.querySelector('#mask') || document.createElement('canvas');
+    this.canvas.setAttribute('id', 'mask');
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.ctx = this.canvas.getContext('2d');
+    this.ctx.fillStyle = "rgba(255, 255, 255, 1)";
+    this.ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    for (var i = 0; i < 60; i++) {
+      var size = 200;
+      var pos = { x: Math.random() * (window.innerWidth - size), y: Math.random() * (window.innerHeight - size) };
+      var gradient = this.ctx.createRadialGradient(pos.x + size / 2, pos.y + size / 2, size / 2, pos.x + size / 2, pos.y + size / 2, 0);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(255,255,255,1)');
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(pos.x, pos.y, size, size);
+    }
+
+    this.canvas.setAttribute('id', 'mask');
+    document.body.appendChild(this.canvas);
+  }
+
+  _createClass(MaskCanvas, [{
+    key: 'render',
+    value: function render() {}
+  }]);
+
+  return MaskCanvas;
+})();
+
+module.exports = MaskCanvas;
+
+},{}],3:[function(require,module,exports){
+'use strict';
+
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+
+var _MaskCanvas = require('./MaskCanvas');
+
+var _MaskCanvas2 = _interopRequireDefault(_MaskCanvas);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -38,10 +87,12 @@ var SlitscanApp = (function () {
       this.camera.position.z = 1;
       this.scene = new THREE.Scene();
 
+      this.maskCanvas = new _MaskCanvas2.default();
+
       // Buffer
       var buffers = [];
       var currentBuffer = 0;
-      var numBuffers = 32;
+      var numBuffers = 8;
       var bufferContainer = document.querySelector('.buffers-container');
       var bufferWidth = 512;
       var bufferHeight = 512;
@@ -59,27 +110,6 @@ var SlitscanApp = (function () {
         };
 
         return texture;
-      };
-
-      var addedGradient = false;
-      var getMask = function getMask(start, stop) {
-        var canvas = document.querySelector('#mask') || document.createElement('canvas');
-        canvas.setAttribute('id', 'mask');
-        canvas.width = bufferWidth;
-        canvas.height = bufferHeight;
-        var ctx = canvas.getContext('2d');
-
-        var grad = ctx.createLinearGradient(0, 0, bufferWidth, bufferHeight);
-        grad.addColorStop(start, "#000");
-        grad.addColorStop(stop, "#FFF");
-
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, bufferWidth, bufferHeight);
-        if (!addedGradient) {
-          addedGradient = true;
-          bufferContainer.appendChild(canvas);
-        }
-        return canvas;
       };
 
       /**
@@ -106,8 +136,6 @@ var SlitscanApp = (function () {
       /**
        * Create Mask
        */
-      var maskIndex = 0;
-      var maskCanvas = getMask(0, 1);
 
       this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       this.renderer.sortObjects = false;
@@ -125,7 +153,7 @@ var SlitscanApp = (function () {
       var uniforms = {
         time: { type: "f", value: 1.0 },
         resolution: { type: "v2", value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-        mask: { type: "t", value: getTexture(maskCanvas) },
+        mask: { type: "t", value: getTexture(this.maskCanvas.canvas) },
         numBuffers: { type: "f", value: numBuffers },
         buffer: { type: "t", value: getTexture(bufferCanvas) },
         spriteSize: { type: "v2", value: new THREE.Vector2(bufferWidth * numBuffers, bufferWidth) },
@@ -147,16 +175,16 @@ var SlitscanApp = (function () {
 
       var render = function render() {
 
-        maskIndex++;
-        if (maskIndex > 100) {
+        /*maskIndex++;
+        if(maskIndex > 100){
           maskIndex = 0;
         }
-        maskCanvas = getMask(maskIndex / 100, 1);
-        var maskTexture = getTexture(maskCanvas);
-        maskTexture.needsUpdate = true;
+        maskCanvas = getMask(maskIndex/100,1)
+        let maskTexture = getTexture(maskCanvas);
+        maskTexture.needsUpdate = true*/
 
         uniforms.time.value += 0.005;
-        uniforms.mask.value = maskTexture;
+        //uniforms.mask.value = maskTexture
 
         _this.renderer.render(_this.scene, _this.camera);
         requestAnimationFrame(render.bind(_this));
@@ -178,7 +206,7 @@ var SlitscanApp = (function () {
 
 module.exports = SlitscanApp;
 
-},{}]},{},[1])
+},{"./MaskCanvas":2}]},{},[1])
 
 
 //# sourceMappingURL=map/index.js.map
